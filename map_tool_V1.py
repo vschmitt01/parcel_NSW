@@ -184,7 +184,7 @@ def parse_bushfire_prone_land(overlay_idx: dict) -> str | None:
     if not entries:
         return None
 
-    return "; ".join(sorted(entries))
+    return "/ ".join(sorted(entries))
 
 
 def parse_groundwater_vulnerability(overlay_idx: dict) -> str | None:
@@ -222,6 +222,43 @@ def parse_groundwater_vulnerability(overlay_idx: dict) -> str | None:
         return None
 
     return "Groundwater Vulnerability: " + "; ".join(sorted(entries))
+
+
+def parse_terrestrial_biodiversity(overlay_idx: dict) -> str | None:
+    rows = overlay_idx.get("Terrestrial Biodiversity Map")
+    if not rows:
+        return None
+
+    entries = set()
+
+    for r in rows:
+        bio_class = r.get("Class") or r.get("title")
+        epi = r.get("EPI Name")
+        commenced = r.get("Commenced Date")
+
+        parts = []
+
+        if bio_class:
+            parts.append(bio_class)
+
+        meta = ", ".join(
+            p for p in [
+                epi,
+                f"Commenced {commenced}" if commenced else None,
+            ]
+            if p
+        )
+
+        if meta:
+            parts.append(f"({meta})")
+
+        if parts:
+            entries.add(" ".join(parts))
+
+    if not entries:
+        return None
+
+    return "Terrestrial Biodiversity: " + "; ".join(sorted(entries))
 
 
 def parse_heritage_flag(overlay_idx: dict) -> str:
@@ -264,7 +301,7 @@ def build_site_dataframe(lotid: str) -> pd.DataFrame:
         "Local Aboriginal Land Council": parse_lalc(overlay_idx),
         "Land Zoning": parse_land_zoning(overlay_idx),
         "BPA": parse_bushfire_prone_land(overlay_idx),
-        "Special Provisions": "; ".join(
+        "Special Provisions": "/ ".join(
             sorted(
                 filter(
                     None,
@@ -272,7 +309,8 @@ def build_site_dataframe(lotid: str) -> pd.DataFrame:
                         parse_special_provisions(overlay_idx),
                         parse_height(overlay_idx),
                         parse_acid_sulfate_soil(overlay_idx),
-                        parse_groundwater_vulnerability(overlay_idx)
+                        parse_groundwater_vulnerability(overlay_idx),
+                        parse_terrestrial_biodiversity(overlay_idx),
                     ],
                 )
             )
