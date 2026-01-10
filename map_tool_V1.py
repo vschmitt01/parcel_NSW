@@ -1,7 +1,9 @@
 import streamlit as st
-import pandas as pd
 import requests
+import pandas as pd
+import numpy as np
 from typing import Dict, Any
+from shapely.geometry import Polygon
 
 BASE_URL = "https://api.apps1.nsw.gov.au/planning/viewersf/V1/ePlanningApi"
 
@@ -71,7 +73,7 @@ def parse_land_zoning(overlay_idx: dict) -> str | None:
     zoning = overlay_idx.get("Land Zoning Map")
     if zoning:
         z = zoning[0]
-        return f"{z.get('Zone')} – {z.get('Land Use')}"
+        return f"{z.get('Zone')}"
     return None
 
 
@@ -277,6 +279,18 @@ def parse_crown_land_flag(overlay_idx: dict) -> str:
     return "Y" if rows else "N"
 
 
+def compute_area_ha(geometry: dict) -> float:
+    rings = geometry.get("rings")
+    if not rings or not rings[0]:
+        return 0.0
+
+    # Only use the first ring (outer boundary)
+    poly = Polygon(rings[0])
+    area_m2 = poly.area  # area in m²
+    area_ha = np.round(area_m2 / 10000, 2)  # convert to hectares
+    return area_ha
+
+
 # ------------------------------------------------------------------
 # Main pipeline → DataFrame row
 # ------------------------------------------------------------------
@@ -285,6 +299,8 @@ def build_site_dataframe(lotid: str) -> pd.DataFrame:
 
     cad_id = lot_info["cadId"]
     prop_id = get_property_id(cad_id)
+    boundaries = get_boundary(cad_id)[0]['geometry']
+    
 
     overlays = get_overlays(cad_id, layers="epi")
     overlay_idx = index_overlays_by_layer(overlays)
@@ -294,7 +310,7 @@ def build_site_dataframe(lotid: str) -> pd.DataFrame:
 
     row = {
         "Address": address,
-        "Site Area (ha)": "",
+        "Site Area (ha)": compute_area_ha(boundaries),
         "Lot Identifier": lotid,
         "Council": council[0],
         "Regional Plan Boundary": parse_regional_plan(overlay_idx),
