@@ -164,6 +164,82 @@ def parse_acid_sulfate_soil(overlay_idx: dict) -> str | None:
     return "Acid Sulfate Soils: " + "; ".join(sorted(entries))
 
 
+def parse_bushfire_prone_land(overlay_idx: dict) -> str | None:
+    rows = overlay_idx.get("Bushfire Prone Land (Non-EPI)")
+    if not rows:
+        return None
+
+    entries = set()
+
+    for r in rows:
+        category = r.get("Category") or r.get("title")
+        parts = []
+
+        if category:
+            parts.append(category)
+
+        if parts:
+            entries.add(" ".join(parts))
+
+    if not entries:
+        return None
+
+    return "; ".join(sorted(entries))
+
+
+def parse_groundwater_vulnerability(overlay_idx: dict) -> str | None:
+    rows = overlay_idx.get("Natural Resource - Groundwater Vulnerability Map")
+    if not rows:
+        return None
+
+    entries = set()
+
+    for r in rows:
+        gw_class = r.get("Class") or r.get("title")
+        epi = r.get("EPI Name")
+        commenced = r.get("Commenced Date")
+
+        parts = []
+
+        if gw_class:
+            parts.append(gw_class)
+
+        meta = ", ".join(
+            p for p in [
+                epi,
+                f"Commenced {commenced}" if commenced else None,
+            ]
+            if p
+        )
+
+        if meta:
+            parts.append(f"({meta})")
+
+        if parts:
+            entries.add(" ".join(parts))
+
+    if not entries:
+        return None
+
+    return "Groundwater Vulnerability: " + "; ".join(sorted(entries))
+
+
+def parse_heritage_flag(overlay_idx: dict) -> str:
+    """
+    Returns 'Y' if Heritage Map overlay exists, else 'N'
+    """
+    rows = overlay_idx.get("Heritage Map")
+    return "Y" if rows else "N"
+
+
+def parse_crown_land_flag(overlay_idx: dict) -> str:
+    """
+    Returns 'Y' if Crown Land overlay exists, else 'N'
+    """
+    rows = overlay_idx.get("Crown Land")
+    return "Y" if rows else "N"
+
+
 # ------------------------------------------------------------------
 # Main pipeline → DataFrame row
 # ------------------------------------------------------------------
@@ -187,7 +263,7 @@ def build_site_dataframe(lotid: str) -> pd.DataFrame:
         "Regional Plan Boundary": parse_regional_plan(overlay_idx),
         "Local Aboriginal Land Council": parse_lalc(overlay_idx),
         "Land Zoning": parse_land_zoning(overlay_idx),
-        "BPA": "",
+        "BPA": parse_bushfire_prone_land(overlay_idx),
         "Special Provisions": "; ".join(
             sorted(
                 filter(
@@ -196,39 +272,31 @@ def build_site_dataframe(lotid: str) -> pd.DataFrame:
                         parse_special_provisions(overlay_idx),
                         parse_height(overlay_idx),
                         parse_acid_sulfate_soil(overlay_idx),
+                        parse_groundwater_vulnerability(overlay_idx)
                     ],
                 )
             )
         ),
+        "Crown Land": parse_crown_land_flag(overlay_idx),
+        "Heritage": parse_heritage_flag(overlay_idx),
     }
 
 
     return pd.DataFrame([row])
 
 
-# ------------------------------------------------------------------
-# Example usage
-# ------------------------------------------------------------------
-if __name__ == "__main__":
-    lotid = "37/G/DP8324"
-
-    df = build_site_dataframe(lotid)
-
-    print(df)
-
-
 
 st.set_page_config(
-    page_title="NSW Planning Lot Lookup",
+    page_title="NSW Planning Helper",
     layout="wide"
 )
 
-st.title("🏗️ NSW Planning Portal – Lot Lookup")
+st.title("NSW Planning Helper")
 
 st.markdown(
     """
-    Enter a **Lot Identifier** (e.g. `37/G/DP8324`) to retrieve
-    planning controls and overlays from the NSW Planning Portal API.
+    Enter a **Lot Identifier** (`-/-/-`) to retrieve
+    planning controls and overlays from the NSW Planning Portal.
     """
 )
 
@@ -256,7 +324,7 @@ if "sites_df" not in st.session_state:
 with st.form("lot_form", clear_on_submit=True):
     lotid = st.text_input(
         "Lot Identifier",
-        placeholder="37/G/DP8324"
+        placeholder="-/-/-"
     )
 
     submitted = st.form_submit_button("Add Lot")
