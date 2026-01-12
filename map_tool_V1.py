@@ -101,7 +101,7 @@ def parse_special_provisions(overlay_idx: dict) -> str | None:
         if r.get("Type"):
             labels.add(r["Type"])
 
-    return "/ ".join(sorted(labels))
+    return " / ".join(sorted(labels))
 
 
 def parse_height(overlay_idx: dict) -> str | None:
@@ -431,3 +431,4 @@ if not st.session_state.sites_df.empty:
         "nsw_planning_sites.csv",
         "text/csv",
     )
+
